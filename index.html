@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ko">
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex">  
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -58,6 +59,29 @@
     .error { display:none; }
   </style>
 </head>
+<script>
+  document.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+  });
+
+  document.addEventListener('dragstart', function (e) {
+    e.preventDefault();
+  });
+
+  document.addEventListener('selectstart', function (e) {
+    e.preventDefault();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (
+      e.key === 'F12' ||
+      (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) ||
+      (e.ctrlKey && ['S', 'U', 'P'].includes(e.key.toUpperCase()))
+    ) {
+      e.preventDefault();
+    }
+  });
+</script>  
 <body>
   <main class="app">
     <section class="book-wrap" aria-label="탭북">
