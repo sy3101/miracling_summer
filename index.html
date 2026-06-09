@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Miracling Summer School Tab Book</title>
+  <meta name="description" content="Miracling Summer School Tab Book" />
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: rgba(255,255,255,.08);
+      --text: #ffffff;
+      --muted: rgba(255,255,255,.66);
+      --edge: clamp(54px, 12vw, 120px);
+      --radius: 18px;
+      --shadow: 0 24px 80px rgba(0,0,0,.38);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { touch-action: pan-y; }
+    .app { width: 100%; height: 100%; display: grid; grid-template-rows: 1fr auto; place-items: center; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 10px; }
+    .book-wrap { position: relative; width: min(100%, calc((100vh - 72px) * .707)); height: min(calc(100vh - 72px), calc(100vw / .707)); perspective: 1700px; display: grid; place-items: center; }
+    .book { position: relative; width: 100%; height: 100%; border-radius: var(--radius); filter: drop-shadow(var(--shadow)); transform-style: preserve-3d; user-select: none; }
+    .page { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: var(--radius); overflow: hidden; background: #f5f5f0; transform-origin: center center; backface-visibility: hidden; display: grid; place-items: center; }
+    .page img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; background: #fff; }
+    .current { z-index: 3; }
+    .incoming { z-index: 2; opacity: 0; }
+    .page.flip-next { animation: flipNext .62s cubic-bezier(.2,.78,.2,1) both; transform-origin: left center; }
+    .page.flip-prev { animation: flipPrev .62s cubic-bezier(.2,.78,.2,1) both; transform-origin: right center; }
+    .page.reveal { animation: reveal .18s ease both; }
+    @keyframes flipNext {
+      0% { transform: rotateY(0deg); filter: brightness(1); clip-path: inset(0 0 0 0 round var(--radius)); }
+      48% { filter: brightness(.82); }
+      100% { transform: rotateY(-120deg); filter: brightness(.72); clip-path: inset(0 0 0 100% round var(--radius)); }
+    }
+    @keyframes flipPrev {
+      0% { transform: rotateY(0deg); filter: brightness(1); clip-path: inset(0 0 0 0 round var(--radius)); }
+      48% { filter: brightness(.82); }
+      100% { transform: rotateY(120deg); filter: brightness(.72); clip-path: inset(0 100% 0 0 round var(--radius)); }
+    }
+    @keyframes reveal { from { opacity: .84; transform: scale(.996); } to { opacity: 1; transform: scale(1); } }
+    .curl { position: absolute; top: 0; bottom: 0; width: 38%; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .16s ease; }
+    .curl.right { right: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.24), rgba(0,0,0,.18)); border-radius: 0 var(--radius) var(--radius) 0; }
+    .curl.left { left: 0; background: linear-gradient(270deg, transparent, rgba(255,255,255,.24), rgba(0,0,0,.18)); border-radius: var(--radius) 0 0 var(--radius); }
+    .book.peek-right .curl.right, .book.peek-left .curl.left { opacity: 1; }
+    .edge { position: absolute; top: 0; bottom: 0; width: var(--edge); z-index: 10; border: 0; padding: 0; background: transparent; cursor: pointer; }
+    .edge::after { content: ''; position: absolute; top: 0; bottom: 0; width: 100%; opacity: 0; transition: opacity .18s ease; }
+    .edge.left { left: 0; }
+    .edge.right { right: 0; }
+    .edge.left::after { left: 0; background: linear-gradient(90deg, rgba(0,0,0,.16), transparent); }
+    .edge.right::after { right: 0; background: linear-gradient(270deg, rgba(0,0,0,.16), transparent); }
+    .edge:hover::after { opacity: 1; }
+    .bar { width: min(100%, 560px); min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 14px; color: var(--muted); font-size: 14px; }
+    .page-count { padding: 7px 12px; border-radius: 999px; background: var(--panel); color: var(--text); font-weight: 700; letter-spacing: .02em; }
+    .hint { white-space: nowrap; }
+    @media (max-width: 520px) { .app { gap: 6px; } .book-wrap { width: min(100%, calc((100vh - 54px) * .707)); height: min(calc(100vh - 54px), calc(100vw / .707)); } .bar { min-height: 34px; font-size: 12px; } .hint { display:none; } .page, .book { border-radius: 10px; } }
+    .loading, .error { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; text-align: center; padding: 24px; background: #111827; color: #fff; }
+    .error { display:none; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="book-wrap" aria-label="탭북">
+      <div id="loading" class="loading">탭북을 불러오는 중입니다.</div>
+      <div id="error" class="error">이미지를 불러오지 못했습니다.<br>assets 폴더와 이미지 파일명을 확인해 주세요.</div>
+      <div id="book" class="book" aria-live="polite">
+        <div id="incoming" class="page incoming"><img alt="다음 페이지" /></div>
+        <div id="current" class="page current"><img alt="현재 페이지" /></div>
+        <div class="curl left"></div>
+        <div class="curl right"></div>
+        <button id="prev" class="edge left" aria-label="이전 페이지"></button>
+        <button id="next" class="edge right" aria-label="다음 페이지"></button>
+      </div>
+    </section>
+    <footer class="bar">
+      <span id="counter" class="page-count">1 / 8</span>
+      <span class="hint">좌우 테두리를 터치하거나 클릭하면 페이지가 넘어갑니다.</span>
+    </footer>
+  </main>
+
+  <script>
+    const pages = [
+      'assets/1.jpg', 'assets/2.jpg', 'assets/3.jpg', 'assets/4.jpg',
+      'assets/5.jpg', 'assets/6.jpg', 'assets/7.jpg', 'assets/8.jpg'
+    ];
+
+    const book = document.getElementById('book');
+    const current = document.getElementById('current');
+    const incoming = document.getElementById('incoming');
+    const currentImg = current.querySelector('img');
+    const incomingImg = incoming.querySelector('img');
+    const counter = document.getElementById('counter');
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+
+    let page = 0;
+    let busy = false;
+    let startX = null;
+
+    function preload(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    async function init() {
+      try {
+        await preload(pages[0]);
+        currentImg.src = pages[0];
+        loading.style.display = 'none';
+        updateCounter();
+        pages.slice(1).forEach(src => { const i = new Image(); i.src = src; });
+      } catch (e) {
+        loading.style.display = 'none';
+        error.style.display = 'grid';
+      }
+    }
+
+    function updateCounter() {
+      counter.textContent = `${page + 1} / ${pages.length}`;
+      prevBtn.style.display = page === 0 ? 'none' : 'block';
+      nextBtn.style.display = page === pages.length - 1 ? 'none' : 'block';
+    }
+
+    async function go(dir) {
+      if (busy) return;
+      const nextPage = page + dir;
+      if (nextPage < 0 || nextPage >= pages.length) return;
+      busy = true;
+
+      incomingImg.src = pages[nextPage];
+      incoming.style.opacity = '1';
+      incoming.classList.remove('reveal');
+      current.classList.remove('flip-next', 'flip-prev');
+      void current.offsetWidth;
+
+      current.classList.add(dir > 0 ? 'flip-next' : 'flip-prev');
+      incoming.classList.add('reveal');
+
+      setTimeout(() => {
+        page = nextPage;
+        currentImg.src = pages[page];
+        current.classList.remove('flip-next', 'flip-prev');
+        incoming.classList.remove('reveal');
+        incoming.style.opacity = '0';
+        updateCounter();
+        busy = false;
+      }, 650);
+    }
+
+    prevBtn.addEventListener('click', () => go(-1));
+    nextBtn.addEventListener('click', () => go(1));
+
+    book.addEventListener('pointermove', (e) => {
+      const r = book.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      book.classList.toggle('peek-left', x < r.width * 0.18 && page > 0);
+      book.classList.toggle('peek-right', x > r.width * 0.82 && page < pages.length - 1);
+    });
+    book.addEventListener('pointerleave', () => book.classList.remove('peek-left', 'peek-right'));
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') go(1);
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1);
+    });
+
+    window.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    window.addEventListener('touchend', (e) => {
+      if (startX === null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 48) go(dx < 0 ? 1 : -1);
+      startX = null;
+    }, { passive: true });
+
+    init();
+  </script>
+</body>
+</html>
